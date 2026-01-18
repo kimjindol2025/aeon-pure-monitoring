@@ -11,6 +11,9 @@ static const char *allowed_tables[] = {
     "evolution_stats",
     "gateway_stats",
     "error_logs",
+    "system_metrics",
+    "api_requests",
+    "worker_status",
     NULL
 };
 

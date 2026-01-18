@@ -585,13 +585,13 @@ void handle_request(int client_fd, const char *request) {
                     snprintf(labels[count], 16, "%ld", timestamp % 10000);
                 }
 
-                // Extract value (fitness, generation, etc - first numeric field after timestamp)
-                const char *val_start = strchr(ts_start, ':');
-                if (val_start) {
-                    val_start = strchr(val_start + 1, ':');
-                    if (val_start) {
-                        values[count] = atof(val_start + 1);
-                    }
+                // Extract fitness value
+                const char *fitness_start = strstr(ptr, "\"fitness\":");
+                if (fitness_start) {
+                    fitness_start += 10;  // "fitness": 길이
+                    values[count] = atof(fitness_start);
+                } else {
+                    values[count] = 0.0;
                 }
 
                 count++;

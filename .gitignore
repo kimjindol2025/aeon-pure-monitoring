@@ -1,24 +1,26 @@
-# Compiled files
+# Binaries
 *.o
 *.a
-*.so
+aeon_api_server
+aeon_api_server_v2
 aeon_monitor_test
+gateway_monitor
 
-# Database files
-data/*.db
-data/*.db-*
+# Database
+*.db
+*.db-journal
 
 # Logs
 *.log
+nohup.out
 
-# Docker volumes
-grafana-storage/
+# OS
+.DS_Store
+Thumbs.db
 
-# IDE
+# Editor
+*.swp
+*.swo
+*~
 .vscode/
 .idea/
-*.swp
-*~
-
-# macOS
-.DS_Store
