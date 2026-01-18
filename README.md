@@ -2,7 +2,7 @@
 
 **철학: 0% 외부 의존성 | 기술 주권 | 순수 C 구현**
 
-AEON 진화 엔진을 위한 순수 모니터링 시스템. Prometheus, InfluxDB 등 무거운 시계열 DB 없이, C → SQLite → Grafana 직결 구조로 실시간 관제를 구현합니다.
+AEON 진화 엔진을 위한 순수 모니터링 시스템. Prometheus, InfluxDB, Grafana Docker 이미지 등 외부 의존성 없이, **순수 C로 구현한 HTTP API 서버 + 웹 대시보드**로 실시간 관제를 구현합니다.
 
 ---
 
@@ -19,7 +19,7 @@ AEON 진화 엔진을 위한 순수 모니터링 시스템. Prometheus, InfluxDB
 ## 아키텍처
 
 ```
-AEON (C)  ─┬─> SQLite (.db)  ──> Grafana (시각화)
+AEON (C)  ─┬─> SQLite (.db)  ──> C HTTP Server ──> Pure HTML/JS Dashboard
            │     └─ evolution_stats
            │     └─ error_logs
            │
@@ -27,11 +27,12 @@ AEON (C)  ─┬─> SQLite (.db)  ──> Grafana (시각화)
 ```
 
 ### 구성 요소
-| 컴포넌트 | 역할 | 파일 크기 |
+| 컴포넌트 | 역할 | 코드 크기 |
 |---------|------|----------|
-| `aeon_monitor.c` | SQLite 연동 C 라이브러리 | ~8KB |
-| `aeon_evolution.db` | 진화 데이터 저장소 | ~100KB/일 |
-| Grafana | 실시간 대시보드 | Docker 이미지 |
+| `aeon_monitor.c` | SQLite 연동 C 라이브러리 | 206줄 |
+| `api_server.c` | 순수 C HTTP API 서버 | 265줄 |
+| `dashboard.html` | 실시간 웹 대시보드 | 220줄 |
+| `aeon_evolution.db` | 진화 데이터 저장소 (SQLite) | ~100KB/일 |
 
 ---
 
@@ -46,37 +47,32 @@ sudo apt install -y gcc sqlite3 libsqlite3-dev docker.io docker-compose
 sudo pacman -S gcc sqlite docker docker-compose
 ```
 
-### 2. Grafana 실행
+### 2. C API 서버 빌드
 ```bash
-cd aeon-pure-monitoring
-docker compose up -d
-
-# 포트 매니저 자동 할당: 40005
-# 접속: http://localhost:40005
-# ID: master_planner
-# PW: aeon_sovereign
+cd aeon-pure-monitoring/src
+make clean
+make aeon_api_server
 ```
 
-### 3. C 라이브러리 빌드 및 테스트
+### 3. 테스트 데이터 생성
 ```bash
-cd src
 make test
-
-# 출력 예시:
-# [AEON Monitor] DB 초기화 완료: ../data/aeon_evolution.db
-# [AEON Stats] Gen:0 | Fitness:0.5000 | Workers:4 | Errors:0 | Status:running
-# [AEON Stats] Gen:1 | Fitness:0.5500 | Workers:4 | Errors:0 | Status:running
-# ...
 ```
 
-### 4. Grafana 대시보드 설정
-1. **Data Source 추가**
-   - Configuration → Data Sources → Add SQLite
-   - Path: `/var/lib/grafana/aeon_data/aeon_evolution.db`
+### 4. API 서버 실행
+```bash
+./aeon_api_server
 
-2. **Dashboard Import**
-   - Dashboards → Import
-   - `grafana/dashboards/aeon-evolution.json` 업로드
+# 또는 백그라운드
+nohup ./aeon_api_server > /tmp/aeon_api.log 2>&1 &
+```
+
+### 5. 대시보드 접속
+```
+http://localhost:40005
+```
+
+**로그인 없음, 즉시 접속 가능**
 
 ---
 
@@ -123,41 +119,37 @@ gcc -o aeon_main aeon_main.c aeon_monitor.c -lsqlite3
 
 ---
 
-## SQL 쿼리 예시 (Grafana)
+## API 엔드포인트
 
-### 1. 적합도 진화 그래프
-```sql
-SELECT
-    timestamp as time,
-    fitness
-FROM evolution_stats
-ORDER BY timestamp ASC
-```
+### GET /api/stats
 
-### 2. 현재 상태
-```sql
-SELECT status
-FROM evolution_stats
-ORDER BY timestamp DESC
-LIMIT 1
-```
+실시간 진화 통계 JSON 반환:
 
-### 3. 에러 통계 (최근 1시간)
-```sql
-SELECT
-    COUNT(*) as error_count
-FROM error_logs
-WHERE timestamp > strftime('%s', 'now') - 3600
-```
-
-### 4. 세대별 평균 적합도
-```sql
-SELECT
-    generation,
-    AVG(fitness) as avg_fitness
-FROM evolution_stats
-GROUP BY generation
-ORDER BY generation
+```json
+{
+  "success": true,
+  "latest": {
+    "fitness": 0.950000,
+    "generation": 9,
+    "workers": 4,
+    "status": "running"
+  },
+  "history": [
+    {
+      "timestamp": 1768741182,
+      "fitness": 0.950000,
+      "generation": 9,
+      "workers": 4,
+      "status": "running"
+    }
+  ],
+  "errors": [
+    {
+      "timestamp": 1768741183,
+      "error_msg": "Test error: Worker 2 crashed"
+    }
+  ]
+}
 ```
 
 ---

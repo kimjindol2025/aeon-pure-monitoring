@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEON Evolution Monitor | Pure Implementation</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #30363d;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            color: #8b949e;
+            font-size: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .stat-card .label {
+            color: #8b949e;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+
+        .chart-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-container h3 {
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #c9d1d9;
+        }
+
+        .status-running { color: #3fb950; }
+        .status-paused { color: #d29922; }
+        .status-error { color: #f85149; }
+
+        .refresh-info {
+            text-align: center;
+            color: #8b949e;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .error-log {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .error-log .error-item {
+            padding: 8px;
+            border-left: 3px solid #f85149;
+            background: rgba(248, 81, 73, 0.1);
+            margin-bottom: 8px;
+            border-radius: 3px;
+        }
+
+        .error-log .error-time {
+            color: #8b949e;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧬 AEON Evolution Monitor</h1>
+        <div class="subtitle">Pure Implementation | 0% External Dependencies | C → SQLite → Web</div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="label">Current Generation</div>
+            <div class="value" id="stat-generation">-</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Fitness Score</div>
+            <div class="value" id="stat-fitness">-</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Active Workers</div>
+            <div class="value" id="stat-workers">-</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Status</div>
+            <div class="value" id="stat-status">-</div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <h3>📈 Fitness Evolution (적합도 진화)</h3>
+        <canvas id="fitnessChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3>🔢 Generation Progress (세대 진행)</h3>
+        <canvas id="generationChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3>⚠️ Recent Errors (최근 에러)</h3>
+        <div class="error-log" id="errorLog">
+            <div style="text-align: center; color: #8b949e;">No errors logged</div>
+        </div>
+    </div>
+
+    <div class="refresh-info">
+        Auto-refresh: 5 seconds | Data source: SQLite (aeon_evolution.db) | Last update: <span id="lastUpdate">-</span>
+    </div>
+
+    <script>
+        // Chart.js 설정
+        const chartConfig = {
+            type: 'line',
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 3,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { color: '#30363d' },
+                        ticks: { color: '#8b949e' }
+                    },
+                    y: {
+                        grid: { color: '#30363d' },
+                        ticks: { color: '#8b949e' }
+                    }
+                }
+            }
+        };
+
+        // Fitness Chart
+        const fitnessCtx = document.getElementById('fitnessChart').getContext('2d');
+        const fitnessChart = new Chart(fitnessCtx, {
+            ...chartConfig,
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Fitness',
+                    data: [],
+                    borderColor: '#58a6ff',
+                    backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            }
+        });
+
+        // Generation Chart
+        const genCtx = document.getElementById('generationChart').getContext('2d');
+        const generationChart = new Chart(genCtx, {
+            ...chartConfig,
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Generation',
+                    data: [],
+                    borderColor: '#3fb950',
+                    backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            }
+        });
+
+        // 데이터 가져오기
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStats(data.latest);
+                    updateCharts(data.history);
+                    updateErrors(data.errors);
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                }
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+            }
+        }
+
+        function updateStats(latest) {
+            if (!latest) return;
+
+            document.getElementById('stat-generation').textContent = latest.generation;
+            document.getElementById('stat-fitness').textContent = latest.fitness.toFixed(4);
+            document.getElementById('stat-workers').textContent = latest.workers;
+
+            const statusEl = document.getElementById('stat-status');
+            statusEl.textContent = latest.status;
+            statusEl.className = `value status-${latest.status}`;
+        }
+
+        function updateCharts(history) {
+            if (!history || history.length === 0) return;
+
+            const labels = history.map(h => new Date(h.timestamp * 1000).toLocaleTimeString());
+            const fitnessData = history.map(h => h.fitness);
+            const genData = history.map(h => h.generation);
+
+            fitnessChart.data.labels = labels;
+            fitnessChart.data.datasets[0].data = fitnessData;
+            fitnessChart.update();
+
+            generationChart.data.labels = labels;
+            generationChart.data.datasets[0].data = genData;
+            generationChart.update();
+        }
+
+        function updateErrors(errors) {
+            const errorLog = document.getElementById('errorLog');
+
+            if (!errors || errors.length === 0) {
+                errorLog.innerHTML = '<div style="text-align: center; color: #8b949e;">No errors logged</div>';
+                return;
+            }
+
+            errorLog.innerHTML = errors.map(err => `
+                <div class="error-item">
+                    <div class="error-time">${new Date(err.timestamp * 1000).toLocaleString()}</div>
+                    <div>${err.error_msg}</div>
+                </div>
+            `).join('');
+        }
+
+        // 초기 로드 및 5초마다 갱신
+        fetchData();
+        setInterval(fetchData, 5000);
+    </script>
+</body>
+</html>
