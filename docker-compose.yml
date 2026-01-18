@@ -5,7 +5,7 @@ services:
     image: grafana/grafana:latest
     container_name: aeon-monitor
     ports:
-      - "3000:3000"
+      - "40005:3000"  # 포트 매니저 할당 (server_id: 4)
     environment:
       - GF_INSTALL_PLUGINS=frser-sqlite-datasource
       - GF_SECURITY_ADMIN_USER=master_planner

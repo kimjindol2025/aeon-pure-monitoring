@@ -49,9 +49,10 @@ sudo pacman -S gcc sqlite docker docker-compose
 ### 2. Grafana 실행
 ```bash
 cd aeon-pure-monitoring
-docker-compose up -d
+docker compose up -d
 
-# 접속: http://localhost:3000
+# 포트 매니저 자동 할당: 40005
+# 접속: http://localhost:40005
 # ID: master_planner
 # PW: aeon_sovereign
 ```
