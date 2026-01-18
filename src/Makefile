@@ -1,15 +1,17 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -std=c11
 LIBS = -lsqlite3 -lpthread
+GATEWAY_LIBS = -lsqlite3 -lcurl -ljson-c
 
 TARGET = aeon_monitor_test
 API_SERVER = aeon_api_server
+GATEWAY_MONITOR = gateway_monitor
 SOURCES = aeon_monitor.c
 OBJECTS = $(SOURCES:.c=.o)
 HEADERS = aeon_monitor.h
 
 # 기본 타겟
-all: $(TARGET) $(API_SERVER)
+all: $(TARGET) $(API_SERVER) $(GATEWAY_MONITOR)
 
 # 테스트 실행 파일 빌드 (EXAMPLE 매크로 포함)
 $(TARGET): $(SOURCES) $(HEADERS)
@@ -27,6 +29,10 @@ libaeon_monitor.a: aeon_monitor.o
 $(API_SERVER): api_server.c aeon_monitor.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
+# Gateway 모니터 빌드
+$(GATEWAY_MONITOR): gateway_monitor.c
+	$(CC) $(CFLAGS) -DGATEWAY_MONITOR_EXAMPLE -o $@ $^ $(GATEWAY_LIBS)
+
 # 테스트 실행
 test: $(TARGET)
 	@echo "=== AEON Monitor 테스트 실행 ==="
@@ -42,9 +48,14 @@ run-api: $(API_SERVER)
 	@echo "URL: http://localhost:40005"
 	./$(API_SERVER)
 
+# Gateway 모니터 실행
+run-gateway: $(GATEWAY_MONITOR)
+	@echo "=== Gateway Monitor 시작 (198 서버) ==="
+	./$(GATEWAY_MONITOR)
+
 # 정리
 clean:
-	rm -f $(OBJECTS) $(TARGET) $(API_SERVER) libaeon_monitor.a
+	rm -f $(OBJECTS) $(TARGET) $(API_SERVER) $(GATEWAY_MONITOR) libaeon_monitor.a
 	rm -f ../data/*.db
 
 # 설치 (시스템 전역)

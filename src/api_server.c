@@ -131,6 +131,51 @@ void get_history_stats(char *json_out, size_t max_size) {
     sqlite3_close(db);
 }
 
+// Gateway 최신 데이터 조회
+void get_latest_gateway(char *json_out, size_t max_size) {
+    sqlite3 *db;
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_open(DB_PATH, &db);
+
+    if (rc != SQLITE_OK) {
+        snprintf(json_out, max_size, "null");
+        return;
+    }
+
+    const char *sql = "SELECT server, pid, phase, status, uptime_days, "
+                      "total_commands, success_rate, block_rate, memory_usage_mb, level "
+                      "FROM gateway_stats ORDER BY timestamp DESC LIMIT 1";
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(json_out, max_size, "null");
+        sqlite3_close(db);
+        return;
+    }
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        snprintf(json_out, max_size,
+            "{\"server\":\"%s\",\"pid\":%d,\"phase\":\"%s\",\"status\":\"%s\","
+            "\"uptime_days\":%.2f,\"total_commands\":%d,\"success_rate\":%.1f,"
+            "\"block_rate\":%.1f,\"memory_usage_mb\":%d,\"level\":\"%s\"}",
+            sqlite3_column_text(stmt, 0),
+            sqlite3_column_int(stmt, 1),
+            sqlite3_column_text(stmt, 2),
+            sqlite3_column_text(stmt, 3),
+            sqlite3_column_double(stmt, 4),
+            sqlite3_column_int(stmt, 5),
+            sqlite3_column_double(stmt, 6),
+            sqlite3_column_double(stmt, 7),
+            sqlite3_column_int(stmt, 8),
+            sqlite3_column_text(stmt, 9));
+    } else {
+        snprintf(json_out, max_size, "null");
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
 // 에러 로그 조회
 void get_errors(char *json_out, size_t max_size) {
     sqlite3 *db;
@@ -182,18 +227,21 @@ void handle_request(int client_fd, const char *request) {
         char latest[1024] = {0};
         char history[32768] = {0};
         char errors[8192] = {0};
+        char gateway[1024] = {0};
         char response[BUFFER_SIZE] = {0};
 
         get_latest_stats(latest, sizeof(latest));
         get_history_stats(history, sizeof(history));
         get_errors(errors, sizeof(errors));
+        get_latest_gateway(gateway, sizeof(gateway));
 
         // JSON 병합
         snprintf(response, sizeof(response),
-            "{\"success\":true,\"latest\":%s,\"history\":%s,\"errors\":%s}",
+            "{\"success\":true,\"latest\":%s,\"history\":%s,\"errors\":%s,\"gateway\":%s}",
             strchr(latest, '{') ? strchr(latest, '{') : "null",
             history,
-            errors);
+            errors,
+            gateway);
 
         send_http_response(client_fd, "application/json", response);
     }
