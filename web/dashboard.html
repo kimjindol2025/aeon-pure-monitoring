@@ -179,6 +179,11 @@
         <canvas id="generationChart"></canvas>
     </div>
 
+    <div class="chart-container" style="max-width: 600px; margin-left: auto; margin-right: auto;">
+        <h3>📊 Status Distribution (상태 분포)</h3>
+        <canvas id="statusChart"></canvas>
+    </div>
+
     <div class="chart-container">
         <h3>⚠️ Recent Errors (최근 에러)</h3>
         <div class="error-log" id="errorLog">
@@ -245,6 +250,55 @@
                     tension: 0.4,
                     fill: true
                 }]
+            }
+        });
+
+        // Status Doughnut Chart
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        const statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Running', 'Paused', 'Error'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: [
+                        'rgba(63, 185, 80, 0.8)',   // Running - Green
+                        'rgba(210, 153, 34, 0.8)',  // Paused - Yellow
+                        'rgba(248, 81, 73, 0.8)'    // Error - Red
+                    ],
+                    borderColor: [
+                        '#3fb950',
+                        '#d29922',
+                        '#f85149'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 2,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            color: '#c9d1d9',
+                            padding: 15,
+                            font: { size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const value = context.parsed;
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                return `${context.label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
             }
         });
 

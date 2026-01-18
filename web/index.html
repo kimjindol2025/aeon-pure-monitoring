@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEON Pure Monitoring</title>
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <div class="header">
+        <h1>🧬 AEON Pure Monitoring</h1>
+        <div class="subtitle">Multi-Dashboard System | 0% External Dependencies</div>
+        <button class="btn-primary" onclick="showCreateDashboardModal()">+ New Dashboard</button>
+    </div>
+
+    <div class="dashboard-tabs" id="dashboardTabs">
+        <div class="tabs-loading">Loading dashboards...</div>
+    </div>
+
+    <div class="dashboard-content" id="dashboardContent">
+        <div class="empty-state">
+            <h2>대시보드를 선택하세요</h2>
+            <p>또는 새 대시보드를 생성하세요</p>
+        </div>
+    </div>
+
+    <!-- 대시보드 생성 모달 -->
+    <div id="createDashboardModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Dashboard</h2>
+                <button class="modal-close" onclick="hideCreateDashboardModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Name (영문, 하이픈만)</label>
+                    <input type="text" id="dashboardName" placeholder="my-dashboard" pattern="[a-z0-9-]+">
+                </div>
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="dashboardTitle" placeholder="My Dashboard">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="dashboardDescription" placeholder="설명 (선택)"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="hideCreateDashboardModal()">Cancel</button>
+                <button class="btn-primary" onclick="createDashboard()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 위젯 추가 모달 -->
+    <div id="addWidgetModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Widget</h2>
+                <button class="modal-close" onclick="hideAddWidgetModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Widget Type</label>
+                    <select id="widgetType" onchange="updateWidgetForm()">
+                        <option value="stat">Stat (단일 값)</option>
+                        <option value="line-chart">Line Chart (시계열)</option>
+                        <option value="bar-chart">Bar Chart (막대)</option>
+                        <option value="table">Table (테이블)</option>
+                        <option value="gauge">Gauge (게이지)</option>
+                        <option value="log">Log (로그)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="widgetTitle" placeholder="Widget Title">
+                </div>
+                <div class="form-group">
+                    <label>Data Source (테이블)</label>
+                    <select id="widgetDataSource">
+                        <option value="evolution_stats">evolution_stats</option>
+                        <option value="gateway_stats">gateway_stats</option>
+                        <option value="error_logs">error_logs</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Query (SQL SELECT)</label>
+                    <textarea id="widgetQuery" placeholder="SELECT * FROM evolution_stats ORDER BY timestamp DESC LIMIT 10"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Width (1-12)</label>
+                    <input type="number" id="widgetWidth" value="4" min="1" max="12">
+                </div>
+                <div class="form-group">
+                    <label>Height (1-6)</label>
+                    <input type="number" id="widgetHeight" value="3" min="1" max="6">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="hideAddWidgetModal()">Cancel</button>
+                <button class="btn-primary" onclick="addWidget()">Add Widget</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="js/api-helper.js"></script>
+    <script src="js/widget-renderer.js"></script>
+    <script src="js/grid-layout.js"></script>
+    <script>
+        let currentDashboard = null;
+        let gridLayout = null;
+        let widgetRenderer = null;
+
+        // 초기화
+        async function init() {
+            widgetRenderer = new WidgetRenderer();
+            await loadDashboards();
+        }
+
+        // 대시보드 목록 로드
+        async function loadDashboards() {
+            try {
+                const result = await API.dashboard.list();
+                renderDashboardTabs(result.dashboards);
+
+                // 기본 대시보드 선택
+                if (result.dashboards.length > 0) {
+                    const defaultDash = result.dashboards.find(d => d.is_default) || result.dashboards[0];
+                    await loadDashboard(defaultDash.id);
+                }
+            } catch (error) {
+                document.getElementById('dashboardTabs').innerHTML =
+                    '<div class="error">Failed to load dashboards</div>';
+            }
+        }
+
+        // 대시보드 탭 렌더링
+        function renderDashboardTabs(dashboards) {
+            const container = document.getElementById('dashboardTabs');
+
+            if (dashboards.length === 0) {
+                container.innerHTML = '<div class="tabs-empty">No dashboards yet</div>';
+                return;
+            }
+
+            let html = '<div class="tabs">';
+            dashboards.forEach(dash => {
+                html += `
+                    <div class="tab ${dash.is_default ? 'default' : ''}"
+                         onclick="loadDashboard(${dash.id})">
+                        <span class="tab-title">${dash.title}</span>
+                        <span class="tab-count">${dash.widget_count}</span>
+                        <button class="tab-delete" onclick="deleteDashboard(${dash.id}, event)">×</button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        // 대시보드 로드
+        async function loadDashboard(dashboardId) {
+            try {
+                const result = await API.dashboard.get(dashboardId);
+                currentDashboard = result.dashboard;
+
+                // 활성 탭 표시
+                document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+                event?.target?.closest('.tab')?.classList.add('active');
+
+                // 그리드 초기화
+                const content = document.getElementById('dashboardContent');
+                content.innerHTML = `
+                    <div class="dashboard-header">
+                        <div>
+                            <h2>${currentDashboard.title}</h2>
+                            <p>${currentDashboard.description || ''}</p>
+                        </div>
+                        <button class="btn-primary" onclick="showAddWidgetModal()">+ Add Widget</button>
+                    </div>
+                    <div class="grid-container" id="gridContainer"></div>
+                `;
+
+                gridLayout = new GridLayout('gridContainer');
+
+                // 위젯 렌더링
+                for (const widget of result.widgets) {
+                    const widgetBody = gridLayout.addWidget(widget);
+                    await widgetRenderer.render(widget, widgetBody);
+                }
+
+                if (result.widgets.length === 0) {
+                    content.querySelector('.grid-container').innerHTML =
+                        '<div class="empty-state">No widgets yet. Click "Add Widget" to start.</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+            }
+        }
+
+        // 대시보드 생성 모달
+        function showCreateDashboardModal() {
+            document.getElementById('createDashboardModal').style.display = 'flex';
+        }
+
+        function hideCreateDashboardModal() {
+            document.getElementById('createDashboardModal').style.display = 'none';
+            document.getElementById('dashboardName').value = '';
+            document.getElementById('dashboardTitle').value = '';
+            document.getElementById('dashboardDescription').value = '';
+        }
+
+        async function createDashboard() {
+            const name = document.getElementById('dashboardName').value;
+            const title = document.getElementById('dashboardTitle').value;
+            const description = document.getElementById('dashboardDescription').value;
+
+            if (!name || !title) {
+                alert('Name and Title are required');
+                return;
+            }
+
+            try {
+                await API.dashboard.create(name, title, description);
+                hideCreateDashboardModal();
+                await loadDashboards();
+            } catch (error) {
+                alert('Failed to create dashboard: ' + error.message);
+            }
+        }
+
+        // 대시보드 삭제
+        async function deleteDashboard(dashboardId, event) {
+            event.stopPropagation();
+
+            if (!confirm('정말로 이 대시보드를 삭제하시겠습니까?')) {
+                return;
+            }
+
+            try {
+                await API.dashboard.delete(dashboardId);
+                await loadDashboards();
+            } catch (error) {
+                alert('Failed to delete dashboard: ' + error.message);
+            }
+        }
+
+        // 위젯 추가 모달
+        function showAddWidgetModal() {
+            if (!currentDashboard) {
+                alert('먼저 대시보드를 선택하세요');
+                return;
+            }
+            document.getElementById('addWidgetModal').style.display = 'flex';
+        }
+
+        function hideAddWidgetModal() {
+            document.getElementById('addWidgetModal').style.display = 'none';
+        }
+
+        async function addWidget() {
+            const type = document.getElementById('widgetType').value;
+            const title = document.getElementById('widgetTitle').value;
+            const dataSource = document.getElementById('widgetDataSource').value;
+            const query = document.getElementById('widgetQuery').value;
+            const width = parseInt(document.getElementById('widgetWidth').value);
+            const height = parseInt(document.getElementById('widgetHeight').value);
+
+            if (!title || !query) {
+                alert('Title and Query are required');
+                return;
+            }
+
+            try {
+                await API.widget.create(currentDashboard.id, {
+                    widget_type: type,
+                    title: title,
+                    data_source: dataSource,
+                    query: query,
+                    config: {},
+                    width: width,
+                    height: height
+                });
+
+                hideAddWidgetModal();
+                await loadDashboard(currentDashboard.id);
+            } catch (error) {
+                alert('Failed to add widget: ' + error.message);
+            }
+        }
+
+        // 위젯 삭제
+        async function deleteWidget(widgetId) {
+            if (!confirm('이 위젯을 삭제하시겠습니까?')) {
+                return;
+            }
+
+            try {
+                await API.widget.delete(widgetId);
+                await loadDashboard(currentDashboard.id);
+            } catch (error) {
+                alert('Failed to delete widget: ' + error.message);
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        init();
+    </script>
+</body>
+</html>
