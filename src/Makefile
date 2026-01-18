@@ -10,11 +10,11 @@ HEADERS = aeon_monitor.h
 # 기본 타겟
 all: $(TARGET)
 
-# 테스트 실행 파일 빌드
-$(TARGET): $(OBJECTS)
-	$(CC) $(CFLAGS) -DAEON_MONITOR_EXAMPLE -o $@ $^ $(LIBS)
+# 테스트 실행 파일 빌드 (EXAMPLE 매크로 포함)
+$(TARGET): $(SOURCES) $(HEADERS)
+	$(CC) $(CFLAGS) -DAEON_MONITOR_EXAMPLE -o $@ $(SOURCES) $(LIBS)
 
-# 오브젝트 파일 생성
+# 오브젝트 파일 생성 (라이브러리용, EXAMPLE 없음)
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
