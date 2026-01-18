@@ -67,67 +67,37 @@ class WidgetRenderer {
         `;
     }
 
-    // 2. Line Chart Widget
-    renderLineChart(widget, container, data) {
+    // 2. Line Chart Widget (Server-side SVG)
+    async renderLineChart(widget, container, data) {
         if (!data.success || !data.data || data.data.length === 0) {
             container.innerHTML = '<div class="widget-error">No data</div>';
             return;
         }
 
-        const config = this.parseConfig(widget.config);
-        const canvas = document.createElement('canvas');
-        container.innerHTML = '';
-        container.appendChild(canvas);
+        container.innerHTML = '<div style="text-align: center; padding: 20px;">Loading chart...</div>';
 
-        const keys = Object.keys(data.data[0]);
-        const xField = config.x_field || keys[0];
-        const yField = config.y_field || keys[1];
-
-        const labels = data.data.map(row => {
-            const val = row[xField];
-            return typeof val === 'number' && val > 1000000000
-                ? new Date(val * 1000).toLocaleTimeString()
-                : val;
-        });
-
-        const values = data.data.map(row => row[yField]);
-
-        const chartId = `chart-${widget.id}`;
-        if (this.charts[chartId]) {
-            this.charts[chartId].destroy();
-        }
-
-        this.charts[chartId] = new Chart(canvas.getContext('2d'), {
-            type: 'line',
-            data: {
-                labels: labels.reverse(),
-                datasets: [{
-                    label: widget.title,
-                    data: values.reverse(),
-                    borderColor: config.color || '#58a6ff',
-                    backgroundColor: config.color ? config.color + '20' : 'rgba(88, 166, 255, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    x: {
-                        grid: { color: '#30363d' },
-                        ticks: { color: '#8b949e' }
-                    },
-                    y: {
-                        grid: { color: '#30363d' },
-                        ticks: { color: '#8b949e' }
-                    }
-                }
+        try {
+            // Fetch SVG from server
+            const response = await fetch(`/api/chart/line?widget_id=${widget.id}`);
+            if (!response.ok) {
+                throw new Error('Chart generation failed');
             }
-        });
+
+            const svgText = await response.text();
+
+            // Display SVG
+            container.innerHTML = svgText;
+
+            // Add responsive styling
+            const svg = container.querySelector('svg');
+            if (svg) {
+                svg.style.width = '100%';
+                svg.style.height = '100%';
+            }
+        } catch (error) {
+            console.error('Line chart error:', error);
+            container.innerHTML = '<div class="widget-error">Chart load failed</div>';
+        }
     }
 
     // 3. Bar Chart Widget

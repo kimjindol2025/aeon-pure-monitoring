@@ -1,5 +1,6 @@
 #include "aeon_monitor.h"
 #include "dashboard_manager.h"
+#include "chart/chart.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -543,6 +544,95 @@ void handle_request(int client_fd, const char *request) {
 
         widget_get_data(DB_PATH, id, response, sizeof(response));
         send_http_response(client_fd, 200, "application/json", response);
+    }
+    // GET /api/chart/line?widget_id={id}
+    else if (strstr(request, "GET /api/chart/line")) {
+        // Extract widget_id from query string
+        const char *query = strstr(request, "widget_id=");
+        if (!query) {
+            send_http_response(client_fd, 400, "text/plain", "Missing widget_id");
+            return;
+        }
+
+        int widget_id = atoi(query + 10);
+
+        // Get widget data
+        char data_json[BUFFER_SIZE] = {0};
+        widget_get_data(DB_PATH, widget_id, data_json, sizeof(data_json));
+
+        // Parse JSON data to extract values and labels
+        // Simple parsing for array of {timestamp, value}
+        double values[50];
+        char *labels[50];
+        int count = 0;
+
+        const char *ptr = strstr(data_json, "[");
+        if (ptr) {
+            ptr++;
+            while (*ptr && count < 50) {
+                // Skip whitespace and commas
+                while (*ptr == ' ' || *ptr == ',' || *ptr == '\n') ptr++;
+                if (*ptr != '{') break;
+
+                // Extract timestamp (label)
+                const char *ts_start = strstr(ptr, "\"timestamp\":");
+                if (ts_start) {
+                    ts_start += 12;
+                    long timestamp = atol(ts_start);
+
+                    // Convert timestamp to simple label
+                    labels[count] = malloc(16);
+                    snprintf(labels[count], 16, "%ld", timestamp % 10000);
+                }
+
+                // Extract value (fitness, generation, etc - first numeric field after timestamp)
+                const char *val_start = strchr(ts_start, ':');
+                if (val_start) {
+                    val_start = strchr(val_start + 1, ':');
+                    if (val_start) {
+                        values[count] = atof(val_start + 1);
+                    }
+                }
+
+                count++;
+                ptr = strchr(ptr, '}');
+                if (ptr) ptr++;
+            }
+        }
+
+        if (count == 0) {
+            send_http_response(client_fd, 500, "text/plain", "No data to chart");
+            return;
+        }
+
+        // Create chart data
+        ChartData chart_data = {
+            .values = values,
+            .labels = labels,
+            .count = count,
+            .title = "Fitness Evolution",
+            .color = "#58a6ff"
+        };
+
+        // Create chart options
+        ChartOptions opts = chart_default_options();
+        opts.width = 800;
+        opts.height = 400;
+
+        // Generate SVG
+        char *svg = chart_create(CHART_LINE, &chart_data, &opts);
+
+        // Free labels
+        for (int i = 0; i < count; i++) {
+            free(labels[i]);
+        }
+
+        if (svg) {
+            send_http_response(client_fd, 200, "image/svg+xml", svg);
+            chart_free(svg);
+        } else {
+            send_http_response(client_fd, 500, "text/plain", "Chart generation failed");
+        }
     }
     else {
         send_http_response(client_fd, 404, "text/plain", "404 Not Found");

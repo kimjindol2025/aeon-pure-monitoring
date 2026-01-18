@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -std=c11
-LIBS = -lsqlite3 -lpthread
+LIBS = -lsqlite3 -lpthread -lm
 GATEWAY_LIBS = -lsqlite3 -lcurl -ljson-c
 
 TARGET = aeon_monitor_test
@@ -10,7 +10,8 @@ GATEWAY_MONITOR = gateway_monitor
 SOURCES = aeon_monitor.c
 OBJECTS = $(SOURCES:.c=.o)
 DASHBOARD_OBJECTS = dashboard_manager.o
-HEADERS = aeon_monitor.h dashboard_manager.h
+CHART_OBJECTS = chart/chart.o chart/svg_generator.o chart/line_chart.o
+HEADERS = aeon_monitor.h dashboard_manager.h chart/chart.h
 
 # 기본 타겟
 all: $(TARGET) $(API_SERVER) $(API_SERVER_V2)
@@ -31,8 +32,8 @@ libaeon_monitor.a: aeon_monitor.o
 $(API_SERVER): api_server.c aeon_monitor.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
-# API 서버 V2 빌드 (멀티 대시보드)
-$(API_SERVER_V2): api_server_v2.c aeon_monitor.o dashboard_manager.o
+# API 서버 V2 빌드 (멀티 대시보드 + 차트)
+$(API_SERVER_V2): api_server_v2.c aeon_monitor.o dashboard_manager.o $(CHART_OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 # Gateway 모니터 빌드
@@ -68,7 +69,7 @@ run-gateway: $(GATEWAY_MONITOR)
 
 # 정리
 clean:
-	rm -f $(OBJECTS) $(DASHBOARD_OBJECTS) $(TARGET) $(API_SERVER) $(API_SERVER_V2) $(GATEWAY_MONITOR) libaeon_monitor.a
+	rm -f $(OBJECTS) $(DASHBOARD_OBJECTS) $(CHART_OBJECTS) $(TARGET) $(API_SERVER) $(API_SERVER_V2) $(GATEWAY_MONITOR) libaeon_monitor.a
 	rm -f ../data/*.db
 
 # 설치 (시스템 전역)

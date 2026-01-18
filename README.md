@@ -1,27 +1,39 @@
 # AEON Pure Monitoring
 
-**철학: 0% 외부 의존성 | 기술 주권 | 순수 C 구현**
+**철학: 0% 외부 의존성 | 기술 주권 | 순수 C 구현** ✅
 
 AEON 진화 엔진을 위한 순수 모니터링 시스템. Prometheus, InfluxDB, Grafana Docker 이미지 등 외부 의존성 없이, **순수 C로 구현한 HTTP API 서버 + 웹 대시보드**로 실시간 관제를 구현합니다.
+
+## 🎯 100% 외부 독립성 달성
+
+- Grafana (500MB Docker) → Pure C (48KB 바이너리)
+- Chart.js CDN → kim-chart (Pure C SVG 생성)
+- **외부 의존성: 100% → 1% → 0%** ✅
 
 ---
 
 ## 핵심 특징
 
+- ✅ **Zero Dependency**: 외부 CDN, Docker, npm 불필요
 - ✅ **Zero Middleware**: 데이터 수집 에이전트 불필요
 - ✅ **Single File Storage**: 단일 SQLite 파일로 모든 데이터 관리
 - ✅ **Local First**: 인터넷 연결 없이 완전히 동작
 - ✅ **Native Performance**: C의 성능을 100% 활용
 - ✅ **Easy Backup**: `cp` 명령어로 백업 완료
+- ✅ **Multi-Dashboard**: 여러 대시보드 + 동적 위젯 추가
+- ✅ **Server-side Charts**: kim-chart로 SVG 차트 생성
 
 ---
 
 ## 아키텍처
 
 ```
-AEON (C)  ─┬─> SQLite (.db)  ──> C HTTP Server ──> Pure HTML/JS Dashboard
-           │     └─ evolution_stats
-           │     └─ error_logs
+AEON (C)  ─┬─> SQLite (.db)  ──> C HTTP Server ──┬──> Pure HTML/JS Dashboard
+           │     └─ evolution_stats               │
+           │     └─ gateway_stats                  └──> kim-chart (SVG)
+           │     └─ error_logs                            └─ Line Chart
+           │     └─ dashboards                             └─ (확장 가능)
+           │     └─ widgets
            │
            └─> 파일 I/O (네트워크 0%)
 ```
@@ -30,9 +42,13 @@ AEON (C)  ─┬─> SQLite (.db)  ──> C HTTP Server ──> Pure HTML/JS Da
 | 컴포넌트 | 역할 | 코드 크기 |
 |---------|------|----------|
 | `aeon_monitor.c` | SQLite 연동 C 라이브러리 | 206줄 |
-| `api_server.c` | 순수 C HTTP API 서버 | 265줄 |
-| `dashboard.html` | 실시간 웹 대시보드 | 220줄 |
+| `dashboard_manager.c` | 멀티 대시보드 매니저 | 500줄 |
+| `api_server_v2.c` | HTTP + 차트 API 서버 | 640줄 |
+| `chart/*.c` | kim-chart (SVG 생성) | 395줄 |
+| `web/*.html/js/css` | 웹 UI | 1,250줄 |
 | `aeon_evolution.db` | 진화 데이터 저장소 (SQLite) | ~100KB/일 |
+
+**총 코드**: 2,991줄 (순수 C + HTML/JS/CSS)
 
 ---
 
