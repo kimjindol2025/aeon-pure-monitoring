@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aeon-monitor
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=frser-sqlite-datasource
+      - GF_SECURITY_ADMIN_USER=master_planner
+      - GF_SECURITY_ADMIN_PASSWORD=aeon_sovereign
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/aeon-evolution.json
+    volumes:
+      - ./data:/var/lib/grafana/aeon_data:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-storage:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - aeon-net
+
+volumes:
+  grafana-storage:
+
+networks:
+  aeon-net:
+    driver: bridge
