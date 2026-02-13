@@ -1,26 +1,108 @@
-# Binaries
+# Binaries & Object Files
 *.o
 *.a
+*.so
+*.dylib
+*.exe
 aeon_api_server
 aeon_api_server_v2
 aeon_monitor_test
 gateway_monitor
+*.out
 
 # Database
 *.db
 *.db-journal
+*.sqlite
+*.sqlite3
 
-# Logs
+# Build Artifacts
+build/
+dist/
+bin/
+obj/
+*.dSYM/
+.cmake/
+CMakeFiles/
+CMakeCache.txt
+
+# Logs & Output
 *.log
 nohup.out
+core
+*.stackdump
+*.backtrace
 
-# OS
+# Testing
+test_results/
+*.gcda
+*.gcno
+coverage/
+.coverage
+
+# Memory Analysis
+valgrind*.log*
+*.memcheck
+
+# OS Generated Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+*$nd
+desktop.ini
 
-# Editor
+# Editor & IDE
 *.swp
 *.swo
 *~
+*.swn
 .vscode/
 .idea/
+.eclipseignore
+*.sublime-project
+*.sublime-workspace
+.atom/
+tags
+.tags
+cscope.out
+*.kate-swp
+
+# Environment & Dependencies
+.env
+.env.local
+.env.*.local
+node_modules/
+venv/
+env/
+
+# Temporary Files
+*.tmp
+*.bak
+*.orig
+*.rej
+*~
+#*#
+
+# System Files
+*.pid
+*.lock
+.cache
+.tmp/
+
+# IDE Specific
+*.cbp
+*.dev
+*.gch
+*.pch
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.swp
+.tern-port
